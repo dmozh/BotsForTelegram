@@ -1,6 +1,6 @@
 import requests
 import subprocess
-from create_helper import bot_handler, credentials
+from create_helper import bot_handler, credentials, sql_requests
 from flask import Flask, request, jsonify
 import threading
 import json
@@ -49,7 +49,6 @@ def set_webhook():
           req.text)
 
 
-
 #main method
 @app.route('/', methods=['POST', 'GET'])
 def index():
@@ -58,8 +57,15 @@ def index():
         chat_id = r['message']['chat']['id']
         msg = r['message']['text']
 
-        handler = bot_handler.BotHandler(msg, chat_id)
-        handler.handler()
+        user_name = r['message']['from']['username']
+        msg_date = r['message']['date']
+
+        sql_handle = bot_handler.SQLHandler(chat_id, user_name, msg, msg_date)
+        sql_handle.insert_user()
+        sql_handle.insert_msg()
+
+        chat_handle = bot_handler.BotHandler(msg, chat_id)
+        chat_handle.handle()
 
         return jsonify(r)
     return 'It is very-very bad('
@@ -69,3 +75,4 @@ if __name__ == '__main__':
     set_tonel()
     set_webhook()
     app.run()
+    # pass
