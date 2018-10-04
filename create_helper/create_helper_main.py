@@ -1,5 +1,6 @@
+import asyncio
 import requests
-import subprocess
+import subprocess, multiprocessing
 from create_helper import bot_handler, credentials, sql_requests
 from flask import Flask, request, jsonify
 import threading
@@ -23,7 +24,7 @@ def start_ngrok():
 #get url for setting a webhook
 def get_url_link():
     event = threading.Event()
-    event.wait(2)
+    event.wait(5)
     url=''
     #try parse
     try:
@@ -54,21 +55,73 @@ def set_webhook():
 def index():
     if request.method == 'POST':
         r = request.get_json()
-        chat_id = r['message']['chat']['id']
-        msg = r['message']['text']
 
-        user_name = r['message']['from']['username']
-        msg_date = r['message']['date']
+        # thread = threading.Thread(target=action(r))
+        # thread.start()
+        if __name__ == "__main__":
+            p = multiprocessing.Process(target=action, args=(r, ))
+            p.start()
+            p.join()
 
-        sql_handle = bot_handler.SQLHandler(chat_id, user_name, msg, msg_date)
-        sql_handle.insert_user()
-        sql_handle.insert_msg()
-
-        chat_handle = bot_handler.BotHandler(msg, chat_id)
-        chat_handle.handle()
+        #
+        # sql_handle = bot_handler.SQLHandler(user_id, user_name, user_fname, msg, msg_date)
+        # sql_handle.insert_user()
+        # sql_handle.insert_msg()
 
         return jsonify(r)
     return 'It is very-very bad('
+
+def action(r):
+    chat_id = ""
+    upd_date = ""
+    user_id = ""
+    user_fname = ""
+    msg = ""
+    try:
+        chat_id = r['message']['chat']['id']  # get simple chat id and msg
+        upd_date = r['message']['date']
+        user_id = r['message']['from']['id']
+        user_fname = r['message']['from']['first_name']
+        msg = r['message']['text']
+        # print(msg)
+    except KeyError:
+        try:
+            chat_id = r['edited_message']['chat']['id']  # get text from edited msg
+            upd_date = r['edited_message']['date']
+            edit_date = r['edited_message']['edit_date']
+            user_id = r['edited_message']['from']['id']
+            user_fname = r['edited_message']['from']['first_name']
+            msg = r['edited_message']['text']
+            # print(msg)
+        except KeyError:
+            try:
+                msg = r['message']['forward_from']['text']  # get text from forward msg
+                # print(msg)
+            except KeyError:
+                try:
+                    msg = r['message']['reply_to_message']['text']  # get text from reply
+                except KeyError:
+                    print("Another action")
+    try:
+        user_name = r['message']['from']['username']
+    except KeyError:
+        try:
+            user_name = r['edited_message']['from']['username']
+        except KeyError:
+            print('User dont have @username')
+            user_name = ""
+
+    print(r)
+    print(chat_id)
+    print(user_id)
+    print(user_name)
+    print(user_fname)
+    print(msg)
+
+    chat_handle = bot_handler.BotHandler(msg, chat_id, user_name, user_fname, user_id, upd_date)
+    loop = asyncio.ProactorEventLoop()  # only OS win32 system method
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(chat_handle.handle())
 
 
 if __name__ == '__main__':
